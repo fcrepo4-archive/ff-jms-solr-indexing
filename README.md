@@ -5,7 +5,7 @@ Installation
 ------------
 
 1. Download and Install Solr from http://lucene.apache.org/solr/
-2. Change the configuration so that a new Searcher is created on every commit, so changes made to the index are visible immediately in e.g. $SOLR_HOME/collection1/conf/solrconfig.xml change  the autocommit part to include <openSearcher>true</openSearcher>
+2. Change the configuration so that a new Searcher is created on every commit, so changes made to the index are visible immediately in e.g. $SOLR_HOME/collection1/conf/solrconfig.xml change  the autocommit part to include ´<openSearcher>true</openSearcher>´
 
     <autoCommit>
         <maxTime>1000</maxTime>
