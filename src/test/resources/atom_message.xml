@@ -1,0 +1,11 @@
+<entry xmlns="http://www.w3.org/2005/Atom">
+	<id>ingestdemo:atomTest2008-03-15T11:12:00Z</id>
+	<title type="text">ingest</title>
+	<updated>2008-03-15T11:12:00Z</updated>
+	<author>
+		<name>fedoraAdmin</name>
+		<uri>baseURL</uri>
+	</author>
+	<summary>demo:atomTest</summary>
+	<content type="text">demo:atomTest</content>
+</entry>
