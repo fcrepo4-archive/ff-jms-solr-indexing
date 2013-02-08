@@ -43,7 +43,7 @@ public class JMSSolrIndexingService extends AbstractJMSClient implements FedoraS
 
     private static Marshaller marshaller;
 
-    private boolean serviceRunning = false;
+    private volatile boolean serviceRunning = false;
 
     // spring injected values
     private String solrUrl;
@@ -63,9 +63,7 @@ public class JMSSolrIndexingService extends AbstractJMSClient implements FedoraS
     }
 
     @Override
-    public synchronized boolean isRunning() {
-        // hmm not sure if synchonrized is needed
-        // wouldn't a volatile variable be enough?
+    public boolean isRunning() {
         return serviceRunning;
     }
     
