@@ -16,33 +16,52 @@ import org.apache.activemq.ActiveMQConnectionFactory;
 import org.apache.activemq.broker.BrokerFactory;
 import org.apache.activemq.broker.BrokerService;
 import org.apache.commons.io.IOUtils;
+import org.junit.After;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 import org.simpleframework.http.core.Container;
 import org.simpleframework.http.core.ContainerServer;
 import org.simpleframework.transport.Server;
 import org.simpleframework.transport.connect.SocketConnection;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration(locations={"classpath:context-test.xml"})
 public class JMSIndexingTest {
-    private static MessageProducer producer;
-
-    private static Session session;
-
-    private static JMSIndexClient client;
-
-    private static BrokerService broker;
     
-    private static Container fedoraContainer;
-    
-    private static Container solrContainer;
-    
-    private static Connection connection;
-    
-    private static Topic topic; 
+    private MessageProducer producer;
+    private Session session;
+    private JMSSolrIndexingService client;
+    private BrokerService broker;
+    private Container fedoraContainer;
+    private Container solrContainer;
+    private Connection connection;
+    private Topic topic; 
 
-    @BeforeClass
-    public static void setup() throws Exception {
+    @Autowired
+    @Qualifier("topicName")
+    private String topicName;
+    
+    @Autowired
+    private FedoraServiceRunner serviceRunner;
+    
+    public void setTopicName(String topicName) {
+        this.topicName = topicName;
+    }
+    
+    public void setFedoraServiceRunner(FedoraServiceRunner serviceRunner){
+        this.serviceRunner = serviceRunner;
+    }
+
+    @Before
+    public  void setup() throws Exception {
         // setup a ActiveMQ Broker and MessageQueue
         broker = BrokerFactory.createBroker(URI.create("broker:tcp://localhost:61616"));
         broker.start();
@@ -54,7 +73,8 @@ public class JMSIndexingTest {
 
         // create the producer
         session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-        topic = session.createTopic(JMSIndexClient.TOPIC_NAME);
+        System.out.println("TOPIC NAME: " + topicName);
+        topic = session.createTopic(topicName);
         producer = session.createProducer(topic);
 
         // start the fedora http mock service
@@ -71,9 +91,8 @@ public class JMSIndexingTest {
         SocketAddress solrAddr = new InetSocketAddress(8081);
         solrConnection.connect(solrAddr);
         
-        // create the actual JMS client listening on the MessageQueue
-        client = new JMSIndexClient();
-        Thread t = new Thread(client);
+        // run the fedora service runner in order to start the indexing service        
+        Thread t = new Thread(serviceRunner);
         t.start();
         // wait for the client to come up
         Thread.sleep(1000);
@@ -88,9 +107,9 @@ public class JMSIndexingTest {
         producer.send(msg);
     }
 
-    @AfterClass
-    public static void teardown() throws Exception {
+    @After
+    public void teardown() throws Exception {
         broker.stop();
-        client.shutdown();
+        serviceRunner.shutdown();
     }
 }

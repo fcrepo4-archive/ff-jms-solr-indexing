@@ -33,15 +33,9 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
+import org.springframework.beans.factory.InitializingBean;
 
-public class JMSIndexClient implements Runnable {
-
-    public static final String TOPIC_NAME="fedora";
-
-    private static String brokerUrl;
-
-    private static String modeshapeUrl = "http://localhost:8080";
-    
+public class JMSSolrIndexingService implements FedoraJMSService, InitializingBean {
 
     private ConnectionFactory jmsFac;
 
@@ -58,26 +52,47 @@ public class JMSIndexClient implements Runnable {
     private static Unmarshaller unmarshaller;
 
     private static Marshaller marshaller;
-    
+
     private Connection conn;
-    
+
     private Topic topic;
 
-    public static void main(String[] args) {
-        if (args.length == 0 || args[0].length() == 0) {
-            System.out.println("No broker URL set. Using default URL");
-            brokerUrl = ActiveMQConnection.DEFAULT_BROKER_URL;
-        } else {
-            brokerUrl = args[0];
-        }
-        Thread t = new Thread(new JMSIndexClient());
-        t.start();
+    // spring injected values
+    private String topicName;
+
+    private String brokerUrl;
+
+    private String modeShapeUrl;
+
+    public void setTopicName(String topicName) {
+        this.topicName = topicName;
     }
 
-    public void run() {
-        brokerUrl = ActiveMQConnection.DEFAULT_BROKER_URL;
+    public void setBrokerUrl(String brokerUrl) {
+        this.brokerUrl = brokerUrl;
+    }
+
+    public void setModeShapeUrl(String modeShapeUrl) {
+        this.modeShapeUrl = modeShapeUrl;
+    }
+
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        if (topicName == null) {
+            throw new IllegalArgumentException("Topic name can not be null. Please check your spring configuration");
+        }
+        if (brokerUrl == null) {
+            throw new IllegalArgumentException("Broker url can not be null. Please check your spring configuration");
+        }
+        if (modeShapeUrl == null) {
+            throw new IllegalArgumentException("Nodeshape url can not be null. Please check your spring configuration");
+        }
+    }
+
+    public boolean startService() {
+        boolean initSuccess = false;
         try {
-            initService();
+            initSuccess = initService();
         } catch (NamingException e) {
             e.printStackTrace();
         } catch (JMSException e) {
@@ -85,7 +100,7 @@ public class JMSIndexClient implements Runnable {
         } catch (JAXBException e) {
             e.printStackTrace();
         }
-        while (!stop) {
+        while (initSuccess && !stop) {
             try {
                 TextMessage msg = (TextMessage) consumer.receive();
                 String xml = msg.getText();
@@ -98,10 +113,11 @@ public class JMSIndexClient implements Runnable {
                 e.printStackTrace();
             }
         }
+        return initSuccess;
     }
 
     private ObjectProfile fetchProfile(String id) throws IOException, IllegalStateException, JAXBException {
-        HttpGet get = new HttpGet(modeshapeUrl + "/rest/objects/" + id);
+        HttpGet get = new HttpGet(modeShapeUrl + "/rest/objects/" + id);
         System.out.println("fetching from URL: " + get.getURI().toASCIIString());
         HttpResponse resp = httpClient.execute(get);
         String profile = IOUtils.toString(resp.getEntity().getContent());
@@ -133,21 +149,28 @@ public class JMSIndexClient implements Runnable {
         }
     }
 
-    private void initService() throws NamingException, JMSException, JAXBException {
+    private boolean initService() throws NamingException, JMSException, JAXBException {
         jmsFac = new ActiveMQConnectionFactory(brokerUrl);
-        conn = jmsFac.createConnection();
+        try {
+            conn = jmsFac.createConnection();
+        } catch (JMSException e) {
+            System.err.println("Unable to connect to broker service at " + brokerUrl);
+            System.err.println("Exiting " + this.getClass().getName() + "...");
+            return false;
+        }
         conn.start();
         sess = conn.createSession(false, Session.AUTO_ACKNOWLEDGE);
-        topic = sess.createTopic(TOPIC_NAME);
+        topic = sess.createTopic(topicName);
         consumer = sess.createConsumer(topic);
         JAXBContext jaxbCtx = JAXBContext.newInstance(Entry.class, ObjectProfile.class);
         unmarshaller = jaxbCtx.createUnmarshaller();
         marshaller = jaxbCtx.createMarshaller();
         marshaller.setProperty("com.sun.xml.bind.namespacePrefixMapper", new JMSClientNameSpacePrefixMapper());
         marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
+        return true;
     }
 
-    public void shutdown() {
+    public void stopService() {
         this.stop = true;
     }
 }
