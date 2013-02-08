@@ -64,6 +64,8 @@ public class JMSSolrIndexingService extends AbstractJMSClient implements FedoraS
 
     @Override
     public synchronized boolean isRunning() {
+        // hmm not sure if synchonrized is needed
+        // wouldn't a volatile variable be enough?
         return serviceRunning;
     }
     
