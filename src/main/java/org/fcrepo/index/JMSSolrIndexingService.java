@@ -33,9 +33,13 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
 
 public class JMSSolrIndexingService implements FedoraJMSService, InitializingBean {
+    
+    private static final Logger LOG = LoggerFactory.getLogger(JMSSolrIndexingService.class);
 
     private ConnectionFactory jmsFac;
 
@@ -118,10 +122,9 @@ public class JMSSolrIndexingService implements FedoraJMSService, InitializingBea
 
     private ObjectProfile fetchProfile(String id) throws IOException, IllegalStateException, JAXBException {
         HttpGet get = new HttpGet(modeShapeUrl + "/rest/objects/" + id);
-        System.out.println("fetching from URL: " + get.getURI().toASCIIString());
+        LOG.debug("fetching from URL: " + get.getURI().toASCIIString());
         HttpResponse resp = httpClient.execute(get);
         String profile = IOUtils.toString(resp.getEntity().getContent());
-        System.out.println("profile: " + profile);
         return (ObjectProfile) unmarshaller.unmarshal(new ByteArrayInputStream(profile.getBytes()));
     }
 
@@ -140,12 +143,11 @@ public class JMSSolrIndexingService implements FedoraJMSService, InitializingBea
         String doc = xmlBuilder.toString();
         HttpPost post = new HttpPost(solrUri);
         post.setEntity(new StringEntity(doc, ContentType.APPLICATION_XML));
-        System.out.println(doc);
         HttpResponse resp = httpClient.execute(post);
         if (resp.getStatusLine().getStatusCode() != 200) {
-            System.err.println("Unable to post document to Solr");
-            System.err.println("Solr says: ");
-            System.err.println(resp.getStatusLine().getStatusCode() + ": " + resp.getStatusLine().getReasonPhrase());
+            LOG.error("Unable to post document to Solr");
+            LOG.error("Solr says: ");
+            LOG.error(resp.getStatusLine().getStatusCode() + ": " + resp.getStatusLine().getReasonPhrase());
         }
     }
 
@@ -154,8 +156,8 @@ public class JMSSolrIndexingService implements FedoraJMSService, InitializingBea
         try {
             conn = jmsFac.createConnection();
         } catch (JMSException e) {
-            System.err.println("Unable to connect to broker service at " + brokerUrl);
-            System.err.println("Exiting " + this.getClass().getName() + "...");
+            LOG.error("Unable to connect to broker service at " + brokerUrl);
+            LOG.error("Exiting " + this.getClass().getName() + "...");
             return false;
         }
         conn.start();
