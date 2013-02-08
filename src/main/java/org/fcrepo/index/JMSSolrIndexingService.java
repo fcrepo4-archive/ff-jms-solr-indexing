@@ -102,18 +102,8 @@ public class JMSSolrIndexingService extends AbstractJMSClient implements FedoraS
     }
 
     private void addToSolr(ObjectProfile profile) throws ClientProtocolException, IOException, ParseException {
-        // translate lastModDate to UTC for Solr
-        DateTimeFormatter df = ISODateTimeFormat.dateTime();
-        DateTime dt = df.parseDateTime(profile.objLastModDate);
-        DateTime dtUtc = new DateTime(dt.getMillis(), DateTimeZone.UTC);
         // create the XML request
-        StringBuilder xmlBuilder = new StringBuilder("<add><doc>");
-        xmlBuilder.append("<field name=\"id\">" + profile.pid + "</field>");
-        xmlBuilder.append("<field name=\"title\">" + profile.objLabel + "</field>");
-        xmlBuilder.append("<field name=\"author\">" + profile.objOwnerId + "</field>");
-        xmlBuilder.append("<field name=\"last_modified\">" + df.print(dtUtc) + "</field>");
-        xmlBuilder.append("</doc></add>");
-        String doc = xmlBuilder.toString();
+        String doc = createXmlRequest(profile);
         HttpPost post = new HttpPost(solrUrl);
         post.setEntity(new StringEntity(doc, ContentType.APPLICATION_XML));
         HttpResponse resp = httpClient.execute(post);
@@ -122,6 +112,21 @@ public class JMSSolrIndexingService extends AbstractJMSClient implements FedoraS
             LOG.error("Solr says: ");
             LOG.error(resp.getStatusLine().getStatusCode() + ": " + resp.getStatusLine().getReasonPhrase());
         }
+    }
+
+    private String createXmlRequest(ObjectProfile profile) {
+        // translate lastModDate to UTC for Solr
+        DateTimeFormatter df = ISODateTimeFormat.dateTime();
+        DateTime dt = df.parseDateTime(profile.objLastModDate);
+        DateTime dtUtc = new DateTime(dt.getMillis(), DateTimeZone.UTC);
+
+        StringBuilder xmlBuilder = new StringBuilder("<add><doc>");
+        xmlBuilder.append("<field name=\"id\">" + profile.pid + "</field>");
+        xmlBuilder.append("<field name=\"title\">" + profile.objLabel + "</field>");
+        xmlBuilder.append("<field name=\"author\">" + profile.objOwnerId + "</field>");
+        xmlBuilder.append("<field name=\"last_modified\">" + df.print(dtUtc) + "</field>");
+        xmlBuilder.append("</doc></add>");
+        return xmlBuilder.toString();
     }
 
     private void initService() throws NamingException, JMSException, JAXBException {
