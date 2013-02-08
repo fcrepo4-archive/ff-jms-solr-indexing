@@ -17,8 +17,6 @@ import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
 
-import org.apache.activemq.ActiveMQConnection;
-import org.apache.activemq.ActiveMQConnectionFactory;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.ClientProtocolException;
@@ -29,6 +27,8 @@ import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.kahadb.util.ByteArrayInputStream;
+import org.fcrepo.messaging.client.AbstractJMSClient;
+import org.fcrepo.service.FedoraService;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
@@ -37,76 +37,51 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
 
-public class JMSSolrIndexingService implements FedoraJMSService, InitializingBean {
-    
+public class JMSSolrIndexingService extends AbstractJMSClient implements FedoraService, InitializingBean {
+
     private static final Logger LOG = LoggerFactory.getLogger(JMSSolrIndexingService.class);
 
-    private ConnectionFactory jmsFac;
-
-    private Session sess;
-
-    private MessageConsumer consumer;
-
-    private boolean stop = false;
+    private boolean shutdown = false;
 
     private HttpClient httpClient = new DefaultHttpClient();
-
-    private URI solrUri = URI.create("http://localhost:8081/solr/update");
 
     private static Unmarshaller unmarshaller;
 
     private static Marshaller marshaller;
 
-    private Connection conn;
-
-    private Topic topic;
-
     // spring injected values
-    private String topicName;
-
-    private String brokerUrl;
+    private String solrUrl;
 
     private String modeShapeUrl;
-
-    public void setTopicName(String topicName) {
-        this.topicName = topicName;
+    
+    public JMSSolrIndexingService(String brokerUrl, String topicName ) throws JMSException{
+        super(brokerUrl,topicName);
     }
 
-    public void setBrokerUrl(String brokerUrl) {
-        this.brokerUrl = brokerUrl;
+    public void setSolrUrl(String solrUrl) {
+        this.solrUrl = solrUrl;
     }
-
+    
     public void setModeShapeUrl(String modeShapeUrl) {
         this.modeShapeUrl = modeShapeUrl;
     }
 
     @Override
     public void afterPropertiesSet() throws Exception {
-        if (topicName == null) {
-            throw new IllegalArgumentException("Topic name can not be null. Please check your spring configuration");
-        }
-        if (brokerUrl == null) {
-            throw new IllegalArgumentException("Broker url can not be null. Please check your spring configuration");
-        }
         if (modeShapeUrl == null) {
             throw new IllegalArgumentException("Nodeshape url can not be null. Please check your spring configuration");
         }
     }
 
-    public boolean startService() {
-        boolean initSuccess = false;
+    public void startService() {
         try {
-            initSuccess = initService();
-        } catch (NamingException e) {
-            e.printStackTrace();
-        } catch (JMSException e) {
-            e.printStackTrace();
-        } catch (JAXBException e) {
+            initService();
+        } catch (Exception e) {
             e.printStackTrace();
         }
-        while (initSuccess && !stop) {
+        while (!shutdown) {
             try {
-                TextMessage msg = (TextMessage) consumer.receive();
+                TextMessage msg = (TextMessage) this.getNextMessage();
                 String xml = msg.getText();
                 // get the id from the message in order to fetch more metadata
                 // from the repo
@@ -117,7 +92,6 @@ public class JMSSolrIndexingService implements FedoraJMSService, InitializingBea
                 e.printStackTrace();
             }
         }
-        return initSuccess;
     }
 
     private ObjectProfile fetchProfile(String id) throws IOException, IllegalStateException, JAXBException {
@@ -141,7 +115,7 @@ public class JMSSolrIndexingService implements FedoraJMSService, InitializingBea
         xmlBuilder.append("<field name=\"last_modified\">" + df.print(dtUtc) + "</field>");
         xmlBuilder.append("</doc></add>");
         String doc = xmlBuilder.toString();
-        HttpPost post = new HttpPost(solrUri);
+        HttpPost post = new HttpPost(solrUrl);
         post.setEntity(new StringEntity(doc, ContentType.APPLICATION_XML));
         HttpResponse resp = httpClient.execute(post);
         if (resp.getStatusLine().getStatusCode() != 200) {
@@ -151,28 +125,15 @@ public class JMSSolrIndexingService implements FedoraJMSService, InitializingBea
         }
     }
 
-    private boolean initService() throws NamingException, JMSException, JAXBException {
-        jmsFac = new ActiveMQConnectionFactory(brokerUrl);
-        try {
-            conn = jmsFac.createConnection();
-        } catch (JMSException e) {
-            LOG.error("Unable to connect to broker service at " + brokerUrl);
-            LOG.error("Exiting " + this.getClass().getName() + "...");
-            return false;
-        }
-        conn.start();
-        sess = conn.createSession(false, Session.AUTO_ACKNOWLEDGE);
-        topic = sess.createTopic(topicName);
-        consumer = sess.createConsumer(topic);
+    private void initService() throws NamingException, JMSException, JAXBException {
         JAXBContext jaxbCtx = JAXBContext.newInstance(Entry.class, ObjectProfile.class);
         unmarshaller = jaxbCtx.createUnmarshaller();
         marshaller = jaxbCtx.createMarshaller();
         marshaller.setProperty("com.sun.xml.bind.namespacePrefixMapper", new JMSClientNameSpacePrefixMapper());
         marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
-        return true;
     }
 
     public void stopService() {
-        this.stop = true;
+        this.shutdown = true;
     }
 }

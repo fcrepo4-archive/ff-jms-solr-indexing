@@ -10,12 +10,13 @@
 	</bean>
 
 	<bean id="solrIndexingService" class="org.fcrepo.index.JMSSolrIndexingService">
-		<property name="topicName" ref="topicName" />
-		<property name="brokerUrl" value="tcp://localhost:61616" />
+		<constructor-arg index="0" value="tcp://localhost:61616" type="java.lang.String" />
+		<constructor-arg index="1" ref="topicName"/>
+		<property name="solrUrl" value="http://localhost:8081/solr/update" />
 		<property name="modeShapeUrl" value="http://localhost:8080" />
 	</bean>
 	
-	<bean id="fedoraServiceRunner" class="org.fcrepo.index.FedoraServiceRunner">
+	<bean id="fedoraServiceRunner" class="org.fcrepo.service.FedoraServiceRunner">
 		<property name="services" >
 			<list>
 				<ref bean="solrIndexingService"/>

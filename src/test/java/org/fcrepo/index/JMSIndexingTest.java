@@ -16,6 +16,7 @@ import org.apache.activemq.ActiveMQConnectionFactory;
 import org.apache.activemq.broker.BrokerFactory;
 import org.apache.activemq.broker.BrokerService;
 import org.apache.commons.io.IOUtils;
+import org.fcrepo.service.FedoraServiceRunner;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -31,42 +32,52 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-
 @RunWith(SpringJUnit4ClassRunner.class)
-@ContextConfiguration(locations={"classpath:context-test.xml"})
+@ContextConfiguration(locations = { "classpath:context-test.xml" })
 public class JMSIndexingTest {
-    
+
+    private static BrokerService broker;
+
     private MessageProducer producer;
+
     private Session session;
+
     private JMSSolrIndexingService client;
-    private BrokerService broker;
+
     private Container fedoraContainer;
+
     private Container solrContainer;
+
     private Connection connection;
-    private Topic topic; 
+
+    private Topic topic;
 
     @Autowired
     @Qualifier("topicName")
     private String topicName;
-    
+
     @Autowired
     private FedoraServiceRunner serviceRunner;
-    
+
     public void setTopicName(String topicName) {
         this.topicName = topicName;
     }
-    
-    public void setFedoraServiceRunner(FedoraServiceRunner serviceRunner){
+
+    public void setFedoraServiceRunner(FedoraServiceRunner serviceRunner) {
         this.serviceRunner = serviceRunner;
     }
 
-    @Before
-    public  void setup() throws Exception {
+    @BeforeClass
+    public static void setupClass() throws Exception {
         // setup a ActiveMQ Broker and MessageQueue
         broker = BrokerFactory.createBroker(URI.create("broker:tcp://localhost:61616"));
         broker.start();
+    }
 
-        // create and start a connection to the solr service for usage in the message producer
+    @Before
+    public void setup() throws Exception {
+        // create and start a connection to the solr service for usage in the
+        // message producer
         ConnectionFactory connectionFactory = new ActiveMQConnectionFactory(ActiveMQConnection.DEFAULT_BROKER_URL);
         connection = connectionFactory.createConnection();
         connection.start();
@@ -83,15 +94,15 @@ public class JMSIndexingTest {
         org.simpleframework.transport.connect.Connection fedoraConnection = new SocketConnection(fedoraServer);
         SocketAddress fedoraAddr = new InetSocketAddress(8080);
         fedoraConnection.connect(fedoraAddr);
-        
+
         // start the Solr http mock service
         solrContainer = new SolrMock();
         Server solrServer = new ContainerServer(solrContainer);
         org.simpleframework.transport.connect.Connection solrConnection = new SocketConnection(solrServer);
         SocketAddress solrAddr = new InetSocketAddress(8081);
         solrConnection.connect(solrAddr);
-        
-        // run the fedora service runner in order to start the indexing service        
+
+        // run the fedora service runner in order to start the indexing service
         Thread t = new Thread(serviceRunner);
         t.start();
         // wait for the client to come up
@@ -109,7 +120,11 @@ public class JMSIndexingTest {
 
     @After
     public void teardown() throws Exception {
-        broker.stop();
         serviceRunner.shutdown();
+    }
+
+    @AfterClass
+    public static void teardownClass() throws Exception {
+        broker.stop();
     }
 }

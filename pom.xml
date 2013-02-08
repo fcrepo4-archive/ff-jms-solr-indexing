@@ -68,6 +68,16 @@
 			<artifactId>spring-context</artifactId>
 			<version>3.2.0.RELEASE</version>
 		</dependency>
+		<dependency>
+			<groupId>org.fcrepo.client</groupId>
+			<artifactId>jms-client</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+		</dependency>
+		<dependency>
+			<groupId>org.fcrepo.services</groupId>
+			<artifactId>service-runner</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+		</dependency>
 	</dependencies>
 	<build>
 		<plugins>
@@ -104,7 +114,6 @@
 					</execution>
 				</executions>
 			</plugin>
-
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
