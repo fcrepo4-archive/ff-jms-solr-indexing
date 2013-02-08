@@ -105,8 +105,6 @@ public class JMSIndexingTest {
         // run the fedora service runner in order to start the indexing service
         Thread t = new Thread(serviceRunner);
         t.start();
-        // wait for the client to come up
-        Thread.sleep(1000);
     }
 
     @Test

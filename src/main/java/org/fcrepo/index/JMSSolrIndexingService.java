@@ -1,16 +1,10 @@
 package org.fcrepo.index;
 
 import java.io.IOException;
-import java.net.URI;
 import java.text.ParseException;
 
-import javax.jms.Connection;
-import javax.jms.ConnectionFactory;
 import javax.jms.JMSException;
-import javax.jms.MessageConsumer;
-import javax.jms.Session;
 import javax.jms.TextMessage;
-import javax.jms.Topic;
 import javax.naming.NamingException;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
@@ -49,23 +43,30 @@ public class JMSSolrIndexingService extends AbstractJMSClient implements FedoraS
 
     private static Marshaller marshaller;
 
+    private boolean serviceRunning = false;
+
     // spring injected values
     private String solrUrl;
 
     private String modeShapeUrl;
-    
-    public JMSSolrIndexingService(String brokerUrl, String topicName ) throws JMSException{
-        super(brokerUrl,topicName);
+
+    public JMSSolrIndexingService(String brokerUrl, String topicName) throws JMSException {
+        super(brokerUrl, topicName);
     }
 
     public void setSolrUrl(String solrUrl) {
         this.solrUrl = solrUrl;
     }
-    
+
     public void setModeShapeUrl(String modeShapeUrl) {
         this.modeShapeUrl = modeShapeUrl;
     }
 
+    @Override
+    public synchronized boolean isRunning() {
+        return serviceRunning;
+    }
+    
     @Override
     public void afterPropertiesSet() throws Exception {
         if (modeShapeUrl == null) {
@@ -73,12 +74,9 @@ public class JMSSolrIndexingService extends AbstractJMSClient implements FedoraS
         }
     }
 
-    public void startService() {
-        try {
-            initService();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    public Object call() throws JAXBException, JMSException, NamingException {
+        initService();
+        serviceRunning = true;
         while (!shutdown) {
             try {
                 TextMessage msg = (TextMessage) this.getNextMessage();
@@ -92,6 +90,7 @@ public class JMSSolrIndexingService extends AbstractJMSClient implements FedoraS
                 e.printStackTrace();
             }
         }
+        return null;
     }
 
     private ObjectProfile fetchProfile(String id) throws IOException, IllegalStateException, JAXBException {
