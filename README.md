@@ -1,3 +1,7 @@
+----
+# This project is no longer maintained
+----
+
 PoC for a Solr indexing client listening on a JMS Queue
 =======================================================
 
